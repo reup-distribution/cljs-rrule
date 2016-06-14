@@ -2,7 +2,7 @@
 
 `[cljs-rrule "0.1.0"]`
 
-A ClojureScript wrapper for [rrule.js](https://github.com/jkbrzt/rrule)
+A ClojureScript wrapper for [rrule.js](https://github.com/jkbrzt/rrule), with common Clojure semantics for `RRule` and `RRuleSet`, conforming to [RFC 2445](https://tools.ietf.org/html/rfc2445) ([with some specific exceptions](https://github.com/jkbrzt/rrule#differences-from-icalendar-rfc)).
 
 ## Usage
 
