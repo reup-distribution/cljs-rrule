@@ -1,1 +1,4 @@
-(ns cljs-rrule.core)
+(ns cljs-rrule.core
+  (:require [rrule.js]))
+
+(def RRule js/RRule)
