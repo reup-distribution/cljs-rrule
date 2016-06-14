@@ -117,9 +117,14 @@
       [(first this)]
       (seq (rest this)))))
 
-(defn rrule [m]
-  (let [js-rrule (js/RRule. (-> m replace-constants clj->js))]
-    (->RRule js-rrule nil)))
+(defn js-rrule [x]
+  (cond
+    (string? x)  (js/RRule.rrulestr x)
+    (map? x)     (js/RRule. (-> x replace-constants clj->js))
+    :else        (throw (ex-info "Invalid RRule argument" {:data x}))))
+
+(defn rrule [x]
+  (->RRule (js-rrule x) nil))
 
 (declare rrule-set)
 
@@ -159,7 +164,7 @@
     (instance? RRule x)
     (.-js-rrule x)
 
-    (map? x)
+    (or (map? x) (string? x))
     (-> x rrule .-js-rrule)
 
     :else

@@ -42,7 +42,12 @@
     (let [d (js/Date. 2006 6 6)
           rrule (rrule/rrule {:freq :weekly :byhour 12 :dtstart d})
           without-hour (dissoc rrule :byhour)]
-      (should= (js/Date. 2006 6 6) (first without-hour)))))
+      (should= (js/Date. 2006 6 6) (first without-hour))))
+
+  (it "accepts an RRule string"
+    (let [s "FREQ=WEEKLY;BYHOUR=12;DTSTART=20060606T120000Z"
+          rrule (rrule/rrule s)]
+      (should= true (instance? js/Date (first rrule))))))
 
 (describe "RRuleSet"
   (it "provides the first date"
@@ -85,4 +90,10 @@
           rrule1 {:freq :weekly :byweekday :sa :dtstart d}
           rrules (rrule/rrule-set [rrule0 rrule1])
           without-rrule0 (disj rrules rrule0)]
-      (should= (js/Date. 2006 6 8) (first without-rrule0)))))
+      (should= (js/Date. 2006 6 8) (first without-rrule0))))
+
+  (it "supports string rules"
+    (let [s0 "FREQ=WEEKLY;BYHOUR=0;DTSTART=20060606T120000Z"
+          s1 "FREQ=WEEKLY;BYHOUR=12;DTSTART=20060606T120000Z"
+          rrules (rrule/rrule-set [s0 s1])]
+      (should= true (instance? js/Date (first rrules))))))
