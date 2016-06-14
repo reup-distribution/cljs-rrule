@@ -6,7 +6,8 @@
   :description "ClojureScript rrule.js wrapper"
   :url "https://github.com/reup-distribution/cljs-rrule"
   :dependencies [[org.clojure/clojure "1.7.0"]
-                 [org.clojure/clojurescript "1.7.228" :scope "provided"]]
+                 [org.clojure/clojurescript "1.7.228" :scope "provided"]
+                 [cljsjs/rrule "2.1.0-838226d-0"]]
   :aliases {"test" ["with-profile" "dev" "cljsbuild" "test"]
             "cljsbuild" ["with-profile" "dev" "cljsbuild"]}
   :profiles {:dev {:dependencies [[speclj "3.3.2"]]

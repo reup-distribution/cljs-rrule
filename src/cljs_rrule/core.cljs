@@ -1,7 +1,7 @@
 (ns cljs-rrule.core
   (:refer-clojure :exclude [frequencies])
   (:require [clojure.set :refer [union]]
-            [rrule.js]))
+            [cljsjs.rrule]))
 
 (def frequencies
   #{:secondly
