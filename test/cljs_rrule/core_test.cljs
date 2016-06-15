@@ -52,7 +52,32 @@
   (it "accepts an RRule string"
     (let [s "FREQ=WEEKLY;BYHOUR=12;DTSTART=20060606T120000Z"
           rrule (rrule/rrule s)]
-      (should= true (instance? js/Date (first rrule))))))
+      (should= true (instance? js/Date (first rrule)))))
+
+  (it "converts to the format expected by python-dateutil"
+    (let [start (js/Date. (js/Date.UTC 2006 6 6))
+          end (js/Date. (js/Date.UTC 2016 4 20))
+          m {:byhour 1
+             :bysetpos -1
+             :byweekday :mo
+             :count 42
+             :dtstart start
+             :freq :weekly
+             :interval 2
+             :until end
+             :wkst :mo}
+          rrule (rrule/rrule m)]
+      (should=
+        {:byhour [1]
+         :bysetpos [-1]
+         :byweekday ["MO"]
+         :count 42
+         :dtstart "20060706T000000Z"
+         :freq "WEEKLY"
+         :interval 2
+         :until "20160520T000000Z"
+         :wkst "MO"}
+        (-> rrule clj->js (js->clj :keywordize-keys true))))))
 
 (describe "RRuleSet"
   (it "provides the first date"

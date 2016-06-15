@@ -1,6 +1,7 @@
 (ns cljs-rrule.core
   (:refer-clojure :exclude [frequencies])
   (:require [clojure.set :refer [union]]
+            [clojure.string :as string]
             [cljsjs.rrule]))
 
 (def frequencies
@@ -99,6 +100,44 @@
 (def rrule-original-options
   (partial rrule-options* "origOptions"))
 
+(defn date-str [date]
+  (-> (.toJSON date)
+      ;; Remove fractional seconds
+      (string/replace #"\.\d+" "")
+      ;; Remove punctuation
+      (string/replace #"\W" "")))
+
+(defn ensure-seq [x]
+  (if (sequential? x)
+      x
+      [x]))
+
+(defn upper-case [x]
+  (-> x name string/upper-case))
+
+(defn upper-case-all [xs]
+  (map upper-case xs))
+
+(def ->js-fns
+  {:bysetpos ensure-seq
+   :bymonth ensure-seq
+   :bymonthday ensure-seq
+   :byyearday ensure-seq
+   :byweekno ensure-seq
+   :byweekday (comp upper-case-all ensure-seq)
+   :byhour ensure-seq
+   :byminute ensure-seq
+   :bysecond ensure-seq
+   :byeaster ensure-seq
+   :dtstart date-str
+   :freq upper-case
+   :until date-str
+   :wkst upper-case})
+
+(defn ->js [k v]
+  (let [f (->js-fns k identity)]
+    (f v)))
+
 (declare rrule)
 
 (deftype RRule [js-rrule prev-start]
@@ -139,7 +178,19 @@
   (-seq [this]
     (lazy-cat
       [(first this)]
-      (seq (rest this)))))
+      (seq (rest this))))
+
+  IEncodeJS
+  (-clj->js [_]
+    (let [options (rrule-original-options js-rrule)]
+      (clj->js
+        (reduce
+          (fn [acc [k v]]
+            (if (nil? v)
+                acc
+                (assoc acc k (->js k v))))
+          {}
+          options)))))
 
 (defn js-rrule [x]
   (cond
