@@ -37,29 +37,53 @@
     {}
     constants))
 
-(def constant->keyword
+(def constant->keyword*
   (reduce
     (fn [acc [k v]]
-      (let [field (if (frequencies k) :freq :byweekday)]
+      (let [field (if (frequencies k) :frequencies :days)]
         (assoc-in acc [field v] k)))
     {}
     keyword->constant))
 
-(defn replace-constants [m]
+(def day-constants
+  "Unfortunately, rrule.js uses distinct objects *and* integers for days of the week"
+  (let [m (:days constant->keyword*)]
+    (reduce
+      (fn [acc [const kw]]
+        (let [n (.-weekday const)]
+          (assoc acc n kw)))
+      m
+      m)))
+
+(def constant->keyword
+  {:freq (:frequencies constant->keyword*)
+   :byweekday day-constants
+   :wkst day-constants})
+
+(defn multi? [x]
+  (or (sequential? x) (array? x)))
+
+(defn replace-kws* [v]
+  (if (multi? v)
+      (map replace-kws* v)
+      (keyword->constant v v)))
+
+(defn replace-kws [m]
   (reduce
     (fn [acc [k v]]
-      (assoc acc k (keyword->constant v v)))
+      (assoc acc k (replace-kws* v)))
     {}
     m))
 
-(defn restore-constant [k v]
-  (let [maybe-keyword (get-in constant->keyword [k v])]
-    (or maybe-keyword v)))
+(defn restore-kws* [k v]
+  (if (multi? v)
+      (map (partial restore-kws* k) v)
+      (get-in constant->keyword [k v] v)))
 
-(defn restore-constants [m]
+(defn restore-kws [m]
   (reduce
     (fn [acc [k v]]
-      (assoc acc k (restore-constant k v)))
+      (assoc acc k (restore-kws* k v)))
     {}
     m))
 
@@ -67,7 +91,7 @@
   (-> js-rrule
       (aget k)
       (js->clj :keywordize-keys true)
-      restore-constants))
+      restore-kws))
 
 (def rrule-options
   (partial rrule-options* "options"))
@@ -86,7 +110,7 @@
           options (aget js-rrule "options")
           v (->> s
                  (aget options)
-                 (restore-constant k)
+                 (restore-kws* k)
                  js->clj)]
       (or v not-found)))
 
@@ -120,7 +144,7 @@
 (defn js-rrule [x]
   (cond
     (string? x)  (js/RRule.rrulestr x)
-    (map? x)     (js/RRule. (-> x replace-constants clj->js))
+    (map? x)     (js/RRule. (-> x replace-kws clj->js))
     :else        (throw (ex-info "Invalid RRule argument" {:data x}))))
 
 (defn rrule [x]

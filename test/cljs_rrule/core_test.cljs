@@ -9,8 +9,13 @@
       (should= [1 3] (:byhour rrule))))
 
   (it "accepts keywords for constants"
-    (let [rrule (rrule/rrule {:freq :weekly})]
-      (should= :weekly (:freq rrule))))
+    (let [m {:freq :weekly
+             :byweekday [:mo :th]
+             :wkst :tu}
+          rrule (rrule/rrule m)]
+      (should= :weekly (:freq rrule))
+      (should= [:mo :th] (:byweekday rrule))
+      (should= :tu (:wkst rrule))))
 
   (it "provides the first date"
     (let [d (js/Date. 2006 6 6)
