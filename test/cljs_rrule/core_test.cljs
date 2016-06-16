@@ -68,7 +68,14 @@
           m {:freq :weekly :byhour 12 :dtstart d}
           a (rrule/rrule m)
           b (rrule/rrule m)]
-      (should= true (= a b))))
+      (should= a b)))
+
+  (it "produces a stable hash for the same values"
+    (let [d (js/Date. 2006 6 6)
+          m {:freq :weekly :byhour 12 :dtstart d}
+          a (rrule/rrule m)
+          b (rrule/rrule m)]
+      (should= (hash a) (hash b))))
 
   (it "converts to the format expected by python-dateutil"
     (let [start (js/Date. (js/Date.UTC 2006 6 6))

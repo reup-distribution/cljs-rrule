@@ -52,7 +52,7 @@
 
 (defn transform-row [f k v]
   (if (or (sequential? v) (array? v))
-      (map (partial transform-row f k) v)
+      (vec (map (partial transform-row f k) v))
       (f k v)))
 
 (defn transform-rows [f m]
@@ -77,17 +77,7 @@
 
 ;;;; Interop
 
-(defn rrule-options* [k js-rrule]
-  (-> js-rrule
-      (aget k)
-      (js->clj :keywordize-keys true)
-      restore-kws))
-
-(def rrule-options
-  (partial rrule-options* "options"))
-
-(def rrule-original-options
-  (partial rrule-options* "origOptions"))
+(def ^:dynamic *normalize-dates?* true)
 
 (defn date-str [date]
   (-> (.toJSON date)
@@ -95,6 +85,11 @@
       (string/replace #"\.\d+" "")
       ;; Remove punctuation
       (string/replace #"\W" "")))
+
+(defn normalize-date-str [date]
+  (if *normalize-dates?*
+      (date-str date)
+      date))
 
 (defn ensure-seq [x]
   (if (sequential? x)
@@ -118,9 +113,9 @@
    :byminute ensure-seq
    :bysecond ensure-seq
    :byeaster ensure-seq
-   :dtstart date-str
+   :dtstart normalize-date-str
    :freq upper-case
-   :until date-str
+   :until normalize-date-str
    :wkst upper-case})
 
 (defn normalize-row [k v]
@@ -135,6 +130,20 @@
           (assoc acc k (normalize-row k v))))
     {}
     options))
+
+(defn rrule-options* [k js-rrule]
+  (binding [*normalize-dates?* false]
+    (-> js-rrule
+        (aget k)
+        (js->clj :keywordize-keys true)
+        restore-kws
+        normalize)))
+
+(def rrule-options
+  (partial rrule-options* "options"))
+
+(def rrule-original-options
+  (partial rrule-options* "origOptions"))
 
 (defn js-rrule? [x]
   (instance? js/RRule x))
@@ -157,6 +166,10 @@
                      (rrule-original-options (.-js-rrule other))]
             normalized (map normalize options)]
         (apply = normalized))))
+
+  IHash
+  (-hash [_]
+    (-> js-rrule rrule-original-options hash))
 
   ILookup
   (-lookup [this k]
@@ -236,8 +249,9 @@
       (rrule-set with-v)))
 
   ISet
-  (-disjoin [this rrule]
-    (let [rrules (set (map rrule-original-options (aget js-rrule-set "_rrule")))
+  (-disjoin [this v]
+    (let [rrules (set (map rrule (aget js-rrule-set "_rrule")))
+          rrule (rrule v)
           without-v (disj rrules rrule)]
       (rrule-set without-v))))
 
