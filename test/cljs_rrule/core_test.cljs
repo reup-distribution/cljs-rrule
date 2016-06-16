@@ -17,6 +17,15 @@
       (should= [:mo :th] (:byweekday rrule))
       (should= :tu (:wkst rrule))))
 
+  (it "accepts uppercase strings for constants"
+    (let [m {:freq "WEEKLY"
+             :byweekday ["MO" "TH"]
+             :wkst "TU"}
+          rrule (rrule/rrule m)]
+      (should= :weekly (:freq rrule))
+      (should= [:mo :th] (:byweekday rrule))
+      (should= :tu (:wkst rrule))))
+
   (it "provides the first date"
     (let [d (js/Date. 2006 6 6)
           rrule (rrule/rrule {:freq :weekly :dtstart d})]
@@ -53,6 +62,13 @@
     (let [s "FREQ=WEEKLY;BYHOUR=12;DTSTART=20060606T120000Z"
           rrule (rrule/rrule s)]
       (should= true (instance? js/Date (first rrule)))))
+
+  (it "determines if instances are equivalent"
+    (let [d (js/Date. 2006 6 6)
+          m {:freq :weekly :byhour 12 :dtstart d}
+          a (rrule/rrule m)
+          b (rrule/rrule m)]
+      (should= true (= a b))))
 
   (it "converts to the format expected by python-dateutil"
     (let [start (js/Date. (js/Date.UTC 2006 6 6))

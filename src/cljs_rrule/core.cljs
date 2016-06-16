@@ -27,7 +27,7 @@
 
 (defn keyword->constant-name [kw]
   (let [s (name kw)]
-    (.toUpperCase s)))
+    (string/upper-case s)))
 
 (def keyword->constant
   (reduce
@@ -63,6 +63,19 @@
 
 (defn multi? [x]
   (or (sequential? x) (array? x)))
+
+(defn replace-strs* [v]
+  (cond
+    (multi? v)   (map replace-strs* v)
+    (string? v)  (-> v string/lower-case keyword)
+    :else        v))
+
+(defn replace-strs [m]
+  (reduce
+    (fn [acc [k v]]
+      (assoc acc k (replace-strs* v)))
+    {}
+    m))
 
 (defn replace-kws* [v]
   (if (multi? v)
@@ -118,7 +131,7 @@
 (defn upper-case-all [xs]
   (map upper-case xs))
 
-(def ->js-fns
+(def normalize-fns
   {:bysetpos ensure-seq
    :bymonth ensure-seq
    :bymonthday ensure-seq
@@ -134,13 +147,31 @@
    :until date-str
    :wkst upper-case})
 
-(defn ->js [k v]
-  (let [f (->js-fns k identity)]
+(defn normalize-row [k v]
+  (let [f (normalize-fns k identity)]
     (f v)))
 
+(defn normalize [options]
+  (reduce
+    (fn [acc [k v]]
+      (if (nil? v)
+          acc
+          (assoc acc k (normalize-row k v))))
+    {}
+    options))
+
 (declare rrule)
+(declare rrule?)
 
 (deftype RRule [js-rrule prev-start]
+  IEquiv
+  (-equiv [_ other]
+    (when (rrule? other)
+      (let [options [(rrule-original-options js-rrule)
+                     (rrule-original-options (.-js-rrule other))]
+            normalized (map normalize options)]
+        (apply = normalized))))
+
   ILookup
   (-lookup [this k]
     (-lookup this k nil))
@@ -165,6 +196,9 @@
           without-k (dissoc options k)]
       (rrule without-k)))
 
+  ICounted
+  (-count [_] (count (js/Object.keys (aget js-rrule "options"))))
+
   ISeq
   (-first [_]
     (let [include-start? (nil? prev-start)
@@ -183,19 +217,16 @@
   IEncodeJS
   (-clj->js [_]
     (let [options (rrule-original-options js-rrule)]
-      (clj->js
-        (reduce
-          (fn [acc [k v]]
-            (if (nil? v)
-                acc
-                (assoc acc k (->js k v))))
-          {}
-          options)))))
+      (clj->js (normalize options)))))
+
+(defn rrule? [x]
+  (instance? RRule x))
 
 (defn js-rrule [x]
   (cond
     (string? x)  (js/RRule.rrulestr x)
-    (map? x)     (js/RRule. (-> x replace-kws clj->js))
+    (rrule? x)   (.-js-rrule x) ;; TODO this may allow inadvertent mutation?
+    (map? x)     (js/RRule. (-> x replace-strs replace-kws clj->js))
     :else        (throw (ex-info "Invalid RRule argument" {:data x}))))
 
 (defn rrule [x]
