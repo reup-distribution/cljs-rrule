@@ -13,12 +13,21 @@
   :profiles {:dev {:dependencies [[speclj "3.3.2"]]
                    :plugins [[lein-cljsbuild "1.1.2"]]
                    :clean-targets ^{:protect false} [:target-path "target/cljsbuild"]
-                   :cljsbuild {:builds [{:id "whitespace"
+                   :cljsbuild {:builds [{:id "advanced"
                                          :source-paths ["src" "test"]
-                                         :compiler {:output-to "target/cljsbuild/build.js"
-                                                    :output-dir "target/cljsbuild"
+                                         :compiler {:output-to "target/advanced/build.js"
+                                                    :output-dir "target/advanced"
+                                                    :optimizations :advanced
+                                                    :source-map "target/advanced/build.js.map"}}
+                                        {:id "whitespace"
+                                         :source-paths ["src" "test"]
+                                         :compiler {:output-to "target/whitespace/build.js"
+                                                    :output-dir "target/whitespace"
                                                     :optimizations :whitespace
-                                                    :source-map "target/cljsbuild/build.js.map"}}]
-                               :test-commands {"whitespace" ["phantomjs"
+                                                    :source-map "target/whitespace/build.js.map"}}]
+                               :test-commands {"advanced" ["phantomjs"
+                                                           "test/runner"
+                                                           "target/advanced/build.js"]
+                                               "whitespace" ["phantomjs"
                                                              "test/runner"
-                                                             "target/cljsbuild/build.js"]}}}})
+                                                             "target/whitespace/build.js"]}}}})
