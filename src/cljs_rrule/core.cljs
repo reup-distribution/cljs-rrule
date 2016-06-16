@@ -50,20 +50,15 @@
    :byweekday constant->day
    :wkst constant->day})
 
-(defn many? [x]
-  (or (sequential? x) (array? x)))
+(defn transform-row [f k v]
+  (if (or (sequential? v) (array? v))
+      (map (partial transform-row f k) v)
+      (f k v)))
 
-(defn one-or-many [f & args]
-  (let [partial-args (butlast args)
-        x (last args)]
-    (if (many? x)
-        (map (apply partial f partial-args) x)
-        (apply f args))))
-
-(defn transform-rows [row-fn m]
+(defn transform-rows [f m]
   (reduce
     (fn [acc [k v]]
-      (assoc acc k (one-or-many row-fn k v)))
+      (assoc acc k (transform-row f k v)))
     {}
     m))
 
@@ -74,11 +69,11 @@
 (def replace-kws
   (partial transform-rows #(keyword->constant %2 %2)))
 
-(defn restore-kws* [k v]
+(defn restore-row-kws [k v]
   (get-in constant->keyword [k v] v))
 
 (def restore-kws
-  (partial transform-rows restore-kws*))
+  (partial transform-rows restore-row-kws))
 
 ;;;; Interop
 
@@ -171,7 +166,7 @@
           options (aget js-rrule "options")
           v (->> s
                  (aget options)
-                 (one-or-many restore-kws* k)
+                 (transform-row restore-row-kws k)
                  js->clj)]
       (or v not-found)))
 
