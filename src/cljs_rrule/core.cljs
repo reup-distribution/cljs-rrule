@@ -1,54 +1,33 @@
 (ns cljs-rrule.core
   (:refer-clojure :exclude [frequencies])
-  (:require [clojure.set :refer [union]]
+  (:require [clojure.set :refer [map-invert]]
             [clojure.string :as string]
             [cljsjs.rrule]))
 
-(def frequencies
-  #{:secondly
-    :minutely
-    :hourly
-    :daily
-    :weekly
-    :monthly
-    :yearly})
+(def frequency->constant
+  {:secondly js/RRule.SECONDLY
+   :minutely js/RRule.MINUTELY
+   :hourly   js/RRule.HOURLY
+   :daily    js/RRule.DAILY
+   :weekly   js/RRule.WEEKLY
+   :monthly  js/RRule.MONTHLY
+   :yearly   js/RRule.YEARLY})
 
-(def days
-  #{:su
-    :mo
-    :tu
-    :we
-    :th
-    :fr
-    :sa})
+(def constant->frequency
+  (map-invert frequency->constant))
 
-(def constants
-  (union frequencies days))
+(def day->constant
+  {:su js/RRule.SU
+   :mo js/RRule.MO
+   :tu js/RRule.TU
+   :we js/RRule.WE
+   :th js/RRule.TH
+   :fr js/RRule.FR
+   :sa js/RRule.SA})
 
-(defn keyword->constant-name [kw]
-  (let [s (name kw)]
-    (string/upper-case s)))
-
-(def keyword->constant
-  (reduce
-    (fn [acc kw]
-      (let [s (keyword->constant-name kw)
-            constant (aget js/RRule s)]
-        (assoc acc kw constant)))
-    {}
-    constants))
-
-(def constant->keyword*
-  (reduce
-    (fn [acc [k v]]
-      (let [field (if (frequencies k) :frequencies :days)]
-        (assoc-in acc [field v] k)))
-    {}
-    keyword->constant))
-
-(def day-constants
-  "Unfortunately, rrule.js uses distinct objects *and* integers for days of the week"
-  (let [m (:days constant->keyword*)]
+(def constant->day
+  (let [m (map-invert day->constant)]
+    ;; Unfortunately, rrule.js uses distinct objects *and* integers for days of the week
     (reduce
       (fn [acc [const kw]]
         (let [n (.-weekday const)]
@@ -56,17 +35,20 @@
       m
       m)))
 
-(def constant->keyword
-  {:freq (:frequencies constant->keyword*)
-   :byweekday day-constants
-   :wkst day-constants})
+(def keyword->constant
+  (merge frequency->constant day->constant))
 
-(defn multi? [x]
+(def constant->keyword
+  {:freq constant->frequency
+   :byweekday constant->day
+   :wkst constant->day})
+
+(defn many? [x]
   (or (sequential? x) (array? x)))
 
 (defn replace-strs* [v]
   (cond
-    (multi? v)   (map replace-strs* v)
+    (many? v)    (map replace-strs* v)
     (string? v)  (-> v string/lower-case keyword)
     :else        v))
 
@@ -78,7 +60,7 @@
     m))
 
 (defn replace-kws* [v]
-  (if (multi? v)
+  (if (many? v)
       (map replace-kws* v)
       (keyword->constant v v)))
 
@@ -90,7 +72,7 @@
     m))
 
 (defn restore-kws* [k v]
-  (if (multi? v)
+  (if (many? v)
       (map (partial restore-kws* k) v)
       (get-in constant->keyword [k v] v)))
 
