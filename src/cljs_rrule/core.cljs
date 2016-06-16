@@ -4,6 +4,13 @@
             [clojure.string :as string]
             [cljsjs.rrule]))
 
+(declare rrule)
+(declare rrule?)
+(declare rrule-set)
+(declare rrule-set?)
+
+;;;; Constants
+
 (def frequency->constant
   {:secondly js/RRule.SECONDLY
    :minutely js/RRule.MINUTELY
@@ -46,42 +53,34 @@
 (defn many? [x]
   (or (sequential? x) (array? x)))
 
-(defn replace-strs* [v]
-  (cond
-    (many? v)    (map replace-strs* v)
-    (string? v)  (-> v string/lower-case keyword)
-    :else        v))
+(defn one-or-many [f & args]
+  (let [partial-args (butlast args)
+        x (last args)]
+    (if (many? x)
+        (map (apply partial f partial-args) x)
+        (apply f args))))
 
-(defn replace-strs [m]
+(defn transform-rows [row-fn m]
   (reduce
     (fn [acc [k v]]
-      (assoc acc k (replace-strs* v)))
+      (assoc acc k (one-or-many row-fn k v)))
     {}
     m))
 
-(defn replace-kws* [v]
-  (if (many? v)
-      (map replace-kws* v)
-      (keyword->constant v v)))
+(def replace-strs
+  (partial transform-rows
+    #(if (string? %2) (-> %2 string/lower-case keyword) %2)))
 
-(defn replace-kws [m]
-  (reduce
-    (fn [acc [k v]]
-      (assoc acc k (replace-kws* v)))
-    {}
-    m))
+(def replace-kws
+  (partial transform-rows #(keyword->constant %2 %2)))
 
 (defn restore-kws* [k v]
-  (if (many? v)
-      (map (partial restore-kws* k) v)
-      (get-in constant->keyword [k v] v)))
+  (get-in constant->keyword [k v] v))
 
-(defn restore-kws [m]
-  (reduce
-    (fn [acc [k v]]
-      (assoc acc k (restore-kws* k v)))
-    {}
-    m))
+(def restore-kws
+  (partial transform-rows restore-kws*))
+
+;;;; Interop
 
 (defn rrule-options* [k js-rrule]
   (-> js-rrule
@@ -142,8 +141,18 @@
     {}
     options))
 
-(declare rrule)
-(declare rrule?)
+(defn js-rrule? [x]
+  (instance? js/RRule x))
+
+(defn js-rrule [x]
+  (cond
+    (js-rrule? x)  x              ;; TODO this may allow inadvertent mutation?
+    (rrule? x)     (.-js-rrule x) ;; TODO this may allow inadvertent mutation?
+    (string? x)    (js/RRule.rrulestr x)
+    (map? x)       (js/RRule. (-> x replace-strs replace-kws clj->js))
+    :else          (throw (ex-info "Invalid RRule argument" {:data x}))))
+
+;;;; RRule
 
 (deftype RRule [js-rrule prev-start]
   IEquiv
@@ -162,7 +171,7 @@
           options (aget js-rrule "options")
           v (->> s
                  (aget options)
-                 (restore-kws* k)
+                 (one-or-many restore-kws* k)
                  js->clj)]
       (or v not-found)))
 
@@ -204,17 +213,10 @@
 (defn rrule? [x]
   (instance? RRule x))
 
-(defn js-rrule [x]
-  (cond
-    (string? x)  (js/RRule.rrulestr x)
-    (rrule? x)   (.-js-rrule x) ;; TODO this may allow inadvertent mutation?
-    (map? x)     (js/RRule. (-> x replace-strs replace-kws clj->js))
-    :else        (throw (ex-info "Invalid RRule argument" {:data x}))))
-
 (defn rrule [x]
   (->RRule (js-rrule x) nil))
 
-(declare rrule-set)
+;;;; RRuleSet
 
 (deftype RRuleSet [js-rrule-set init-start prev-start]
   ISeq
@@ -244,20 +246,6 @@
           without-v (disj rrules rrule)]
       (rrule-set without-v))))
 
-(defn ->js-rrule [x]
-  (cond
-    (instance? js/RRule x)
-    x
-
-    (instance? RRule x)
-    (.-js-rrule x)
-
-    (or (map? x) (string? x))
-    (-> x rrule .-js-rrule)
-
-    :else
-    (throw (ex-info "Invalid RRule argument" {:data x}))))
-
 (defn earliest [& dates]
   (->> dates
        (sort-by #(.getTime %))
@@ -265,7 +253,7 @@
 
 (defn rrule-set [rrules]
   (let [js-rrule-set (js/RRuleSet.)
-        js-rrules (map ->js-rrule rrules)
+        js-rrules (map js-rrule rrules)
         init-start (reduce
                      (fn [acc rrule]
                        (let [dtstart (aget rrule "options" "dtstart")]
@@ -277,3 +265,6 @@
     (doseq [js-rrule js-rrules]
       (.rrule js-rrule-set js-rrule))
     (->RRuleSet js-rrule-set init-start nil)))
+
+(defn rrule-set? [x]
+  (instance? RRuleSet x))
